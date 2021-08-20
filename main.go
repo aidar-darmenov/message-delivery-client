@@ -1,14 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"github.com/aidar-darmenov/message-delivery-client/config"
 	"log"
 	"net"
+	"os"
 	"strconv"
 )
-import "fmt"
-import "bufio"
-import "os"
 
 func main() {
 
