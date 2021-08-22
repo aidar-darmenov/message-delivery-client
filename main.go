@@ -6,11 +6,18 @@ import (
 	"github.com/aidar-darmenov/message-delivery-client/webservice"
 	"go.uber.org/zap"
 	"log"
+	"os"
+	"strconv"
 )
 
 func main() {
 
-	cfg := config.NewConfiguration("config/config.json")
+	port, err := strconv.Atoi(os.Args[1])
+	if err != nil {
+		log.Fatal("Incorrect command line arguments")
+	}
+
+	cfg := config.NewConfiguration("config/config.json", port)
 
 	// Used uber zap logger for simple example. Now it writes in console
 	// Usually, for this purposes we use logs sent to Kibana Elastic Search through Kafka

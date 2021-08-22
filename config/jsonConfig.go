@@ -15,9 +15,12 @@ type Configuration struct {
 }
 
 //NewConfiguration read file, return configuration
-func NewConfiguration(path string) *Configuration {
+func NewConfiguration(path string, port int) *Configuration {
 	var configuration Configuration
 	configuration.InitConfigParams(path)
+	if port != 0 {
+		configuration.HttpPort = port
+	}
 	return &configuration
 }
 

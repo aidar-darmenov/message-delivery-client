@@ -1,7 +1,7 @@
 package service
 
 import (
-	"fmt"
+	"log"
 )
 
 func (s *Service) StartTcpClient() {
@@ -9,6 +9,5 @@ func (s *Service) StartTcpClient() {
 	go s.HandleClientIncomingTraffic()
 	s.HandleClientOutgoingTraffic()
 
-	fmt.Println("")
-	fmt.Println("Client was shut off")
+	log.Fatal("Client was shut off")
 }

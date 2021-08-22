@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aidar-darmenov/message-delivery-client/model"
+	"go.uber.org/zap"
 	"net"
 )
 
@@ -28,9 +29,6 @@ func (s *Service) SendMessageToServer(conn *net.TCPConn, message model.MessageTo
 
 	binary.BigEndian.PutUint16(msg_len_data, uint16(len(data)))
 
-	fmt.Println("content length bytes: ", msg_len_data)
-	fmt.Println("content bytes: ", data)
-
 	buf.Write(msg_len_data)
 	buf.Write(data)
 
@@ -50,7 +48,7 @@ func (s *Service) HandleClientOutgoingTraffic() {
 		case message := <-s.ChannelMessages:
 			err := s.SendMessageToServer(s.TcpConnection, message)
 			if err != nil {
-				fmt.Println("Error: ", err)
+				s.Logger.Error("Error sending message to server", zap.Error(err))
 			}
 		}
 	}
@@ -65,12 +63,12 @@ func (s *Service) HandleClientIncomingTraffic() {
 		e, ok := err.(net.Error)
 
 		if err != nil && ok && !e.Timeout() {
-			fmt.Println(err)
+			s.Logger.Error("Error reading content length from TCP connection", zap.Error(err))
 			break
 		}
 
 		if n > 0 {
-			contentLength = getContentLength(buf[:n])
+			contentLength = s.GetContentLength(buf[:n])
 		} else {
 			s.TcpConnection.Write([]byte("n<0"))
 		}
@@ -79,24 +77,25 @@ func (s *Service) HandleClientIncomingTraffic() {
 		e, ok = err.(net.Error)
 
 		if err != nil && ok && !e.Timeout() {
-			fmt.Println(err)
+			s.Logger.Error("Error reading content from TCP connection", zap.Error(err))
 			break
 		}
 
 		if n > 0 {
-			processContent(buf[:n])
+			s.ProcessContent(buf[:n])
 		} else {
 			s.TcpConnection.Write([]byte("n<0"))
 		}
 	}
 }
 
-func getContentLength(bufContentLength []byte) int {
+func (s *Service) GetContentLength(bufContentLength []byte) int {
 	cl := int(binary.BigEndian.Uint16(bufContentLength))
-	fmt.Println("content length: ", cl)
+	s.Logger.Info(fmt.Sprintf("content length: %d", cl))
 	return cl
 }
 
-func processContent(buf []byte) {
-	fmt.Println("content: " + string(buf))
+func (s *Service) ProcessContent(buf []byte) {
+	s.Logger.Info(fmt.Sprintf("content: %v", string(buf)))
+	fmt.Println("message from client: ", string(buf))
 }
