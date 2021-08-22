@@ -1,5 +1,7 @@
 {
-  "Host": "localhost",
-  "Port": 8089,
-  "Type": "tcp"
+  "HttpPort": 8082,
+  "ConnectionHost": "localhost",
+  "ConnectionPort": 8089,
+  "ConnectionType": "tcp",
+  "ChannelMessagesSize": 50
 }

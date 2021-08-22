@@ -7,9 +7,11 @@ import (
 )
 
 type Configuration struct {
-	Host string
-	Port int
-	Type string
+	HttpPort            int
+	ConnectionHost      string
+	ConnectionPort      int
+	ConnectionType      string
+	ChannelMessagesSize int
 }
 
 //ReadFile

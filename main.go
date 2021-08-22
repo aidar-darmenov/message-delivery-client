@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"github.com/aidar-darmenov/message-delivery-client/config"
+	"github.com/aidar-darmenov/message-delivery-client/model"
 	"log"
 	"net"
-	"os"
 	"strconv"
 )
 
@@ -16,44 +16,51 @@ func main() {
 
 	cfg := config.NewConfiguration("config/config.json")
 
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)))
+	var channelMessages chan model.MessageToClients
+	channelMessages = make(chan model.MessageToClients, cfg.ChannelMessagesSize)
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", net.JoinHostPort(cfg.ConnectionHost, strconv.Itoa(cfg.ConnectionPort)))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	conn, err := net.DialTCP(cfg.Type, nil, tcpAddr)
+	conn, err := net.DialTCP(cfg.ConnectionType, nil, tcpAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	go handleClientIncomingTraffic(conn)
-	//handleClientOutgoingTraffic(conn)
+	handleClientOutgoingTraffic(conn, channelMessages)
 
 	fmt.Println("")
-	fmt.Println("Have read message")
+	fmt.Println("Client was shut off")
 }
 
-func handleClientOutgoingTraffic(conn *net.TCPConn) {
+func handleClientOutgoingTraffic(conn *net.TCPConn, channelMessages chan model.MessageToClients) {
 	for {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Text to send: ")
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("err reading from input", err)
-			return
+		select {
+		case message := <-channelMessages:
+			err := sendMessageToServer(conn, message)
+			if err != nil {
+				fmt.Println("Error: ", err)
+			}
 		}
 
-		sendMessageToServer(conn, text)
 	}
 
 }
 
-func sendMessageToServer(conn *net.TCPConn, message string) error {
+func sendMessageToServer(conn *net.TCPConn, message model.MessageToClients) error {
 
 	var (
-		data         = []byte(message)
+		data         []byte
 		msg_len_data = make([]byte, 2)
 		buf          = bytes.Buffer{}
 	)
+
+	data, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
 
 	binary.BigEndian.PutUint16(msg_len_data, uint16(len(data)))
 
@@ -63,7 +70,7 @@ func sendMessageToServer(conn *net.TCPConn, message string) error {
 	buf.Write(msg_len_data)
 	buf.Write(data)
 
-	_, err := conn.Write(buf.Bytes())
+	_, err = conn.Write(buf.Bytes())
 	if err != nil {
 		return err
 	}
