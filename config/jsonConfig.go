@@ -14,8 +14,14 @@ type Configuration struct {
 	ChannelMessagesSize int
 }
 
-//ReadFile
-func (c *Configuration) ReadFile(path string) {
+//NewConfiguration read file, return configuration
+func NewConfiguration(path string) *Configuration {
+	var configuration Configuration
+	configuration.InitConfigParams(path)
+	return &configuration
+}
+
+func (c *Configuration) InitConfigParams(path string) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
@@ -27,9 +33,6 @@ func (c *Configuration) ReadFile(path string) {
 	}
 }
 
-//NewConfiguration
-func NewConfiguration(path string) *Configuration {
-	var configuration Configuration
-	configuration.ReadFile(path)
-	return &configuration
+func (c *Configuration) Params() *Configuration {
+	return c
 }

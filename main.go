@@ -1,126 +1,33 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/json"
-	"fmt"
 	"github.com/aidar-darmenov/message-delivery-client/config"
-	"github.com/aidar-darmenov/message-delivery-client/model"
+	"github.com/aidar-darmenov/message-delivery-client/service"
+	"github.com/aidar-darmenov/message-delivery-client/webservice"
+	"go.uber.org/zap"
 	"log"
-	"net"
-	"strconv"
 )
 
 func main() {
 
 	cfg := config.NewConfiguration("config/config.json")
 
-	var channelMessages chan model.MessageToClients
-	channelMessages = make(chan model.MessageToClients, cfg.ChannelMessagesSize)
+	// Used uber zap logger for simple example. Now it writes in console
+	// Usually, for this purposes we use logs sent to Kibana Elastic Search through Kafka
+	var loggerConfig = zap.NewProductionConfig()
+	loggerConfig.Level.SetLevel(zap.DebugLevel)
 
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", net.JoinHostPort(cfg.ConnectionHost, strconv.Itoa(cfg.ConnectionPort)))
+	logger, err := loggerConfig.Build()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	conn, err := net.DialTCP(cfg.ConnectionType, nil, tcpAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	go handleClientIncomingTraffic(conn)
-	handleClientOutgoingTraffic(conn, channelMessages)
+	// Creating abstract service(business logic) layer
+	s := service.NewService(cfg, logger)
 
-	fmt.Println("")
-	fmt.Println("Client was shut off")
-}
+	// Creating abstract webService(delivery) layer
+	ws := webservice.NewWebService(s)
+	go ws.Start()
 
-func handleClientOutgoingTraffic(conn *net.TCPConn, channelMessages chan model.MessageToClients) {
-	for {
-		select {
-		case message := <-channelMessages:
-			err := sendMessageToServer(conn, message)
-			if err != nil {
-				fmt.Println("Error: ", err)
-			}
-		}
-
-	}
-
-}
-
-func sendMessageToServer(conn *net.TCPConn, message model.MessageToClients) error {
-
-	var (
-		data         []byte
-		msg_len_data = make([]byte, 2)
-		buf          = bytes.Buffer{}
-	)
-
-	data, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	binary.BigEndian.PutUint16(msg_len_data, uint16(len(data)))
-
-	fmt.Println("content length bytes: ", msg_len_data)
-	fmt.Println("content bytes: ", data)
-
-	buf.Write(msg_len_data)
-	buf.Write(data)
-
-	_, err = conn.Write(buf.Bytes())
-	if err != nil {
-		return err
-	}
-
-	buf.Reset()
-
-	return nil
-}
-
-func handleClientIncomingTraffic(conn *net.TCPConn) {
-	for {
-		var buf [2048]byte
-		var contentLength int
-
-		n, err := conn.Read(buf[:2])
-		e, ok := err.(net.Error)
-
-		if err != nil && ok && !e.Timeout() {
-			fmt.Println(err)
-			break
-		}
-
-		if n > 0 {
-			contentLength = getContentLength(buf[:n])
-		} else {
-			conn.Write([]byte("n<0"))
-		}
-
-		n, err = conn.Read(buf[:contentLength])
-		e, ok = err.(net.Error)
-
-		if err != nil && ok && !e.Timeout() {
-			fmt.Println(err)
-			break
-		}
-
-		if n > 0 {
-			processContent(buf[:n])
-		} else {
-			conn.Write([]byte("n<0"))
-		}
-	}
-}
-
-func getContentLength(bufContentLength []byte) int {
-	cl := int(binary.BigEndian.Uint16(bufContentLength))
-	fmt.Println("content length: ", cl)
-	return cl
-}
-
-func processContent(buf []byte) {
-	fmt.Println("content: " + string(buf))
+	s.StartTcpClient()
 }
