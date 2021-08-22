@@ -14,7 +14,34 @@ func (s *Service) SendMessageToClientsByIds(message model.MessageToClients) {
 	s.ChannelMessages <- message
 }
 
-func (s *Service) SendMessageToServer(conn *net.TCPConn, message model.MessageToClients) error {
+func (s *Service) SendParamsToServer(params model.ClientParams) error {
+	var (
+		data         []byte
+		msg_len_data = make([]byte, 2)
+		buf          = bytes.Buffer{}
+	)
+
+	data, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+
+	binary.BigEndian.PutUint16(msg_len_data, uint16(len(data)))
+
+	buf.Write(msg_len_data)
+	buf.Write(data)
+
+	_, err = s.TcpConnection.Write(buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	buf.Reset()
+
+	return nil
+}
+
+func (s *Service) SendMessageToServer(message model.MessageToClients) error {
 
 	var (
 		data         []byte
@@ -32,7 +59,7 @@ func (s *Service) SendMessageToServer(conn *net.TCPConn, message model.MessageTo
 	buf.Write(msg_len_data)
 	buf.Write(data)
 
-	_, err = conn.Write(buf.Bytes())
+	_, err = s.TcpConnection.Write(buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -46,7 +73,7 @@ func (s *Service) HandleClientOutgoingTraffic() {
 	for {
 		select {
 		case message := <-s.ChannelMessages:
-			err := s.SendMessageToServer(s.TcpConnection, message)
+			err := s.SendMessageToServer(message)
 			if err != nil {
 				s.Logger.Error("Error sending message to server", zap.Error(err))
 			}
